@@ -8,7 +8,7 @@ A drop-in API gateway that reduces LLM inference costs automatically — no code
 
 ## MVP Plan
 
-**Scope:** Router only. OpenAI-compatible endpoint customers point at instead of `api.openai.com`. No dashboard, no compression, no caching — just routing. Flat monthly fee.
+**Scope:** Host [RouteLLM](https://github.com/lm-sys/routellm) (UC Berkeley/Anyscale) as a managed OpenAI-compatible proxy. Add auth, per-customer logging, and billing on top. No custom classifier, no dashboard.
 
 **Success criterion:** First paying customer running production traffic through it.
 
@@ -16,9 +16,12 @@ A drop-in API gateway that reduces LLM inference costs automatically — no code
 
 ```
 Customer app
-    │  POST /v1/chat/completions (same OpenAI schema)
+    │  POST /v1/chat/completions (OpenAI schema, customer's own API key)
     ▼
-Promptware Gateway  ←── classifier: simple or complex?
+Auth shim (FastAPI)  ──── validates customer key, injects OpenAI key
+    │
+    ▼
+RouteLLM server  ──── classifies request complexity
     │                        │
     ├── simple ──────────────▶  gpt-4o-mini  (cheap)
     └── complex ─────────────▶  gpt-4o       (full)
@@ -27,38 +30,41 @@ Promptware Gateway  ←── classifier: simple or complex?
 Response proxied back to customer (transparent)
 ```
 
-**Classifier:** lightweight heuristic first (token count, keyword signals, presence of code/tools). Swap for a trained model later if needed.
+Customers bring their own OpenAI key — no key management or markup on our side.
 
 ### Build Milestones
 
 | Week | Milestone |
 |---|---|
-| 1 | FastAPI server with `/v1/chat/completions` proxy — passes all requests through unchanged. Customers can point at it and nothing breaks. |
-| 1 | Add API key auth: customers send their own OpenAI key, gateway forwards it. No key management on our side. |
-| 2 | Classifier v1: heuristic routing. Simple requests → gpt-4o-mini. Log every decision + cost delta. |
-| 2 | Deploy to a VPS (Hetzner/Fly.io). Latency target: <50ms added overhead. |
-| 3 | Per-customer usage logging (tokens in/out, model used, estimated cost saved). No UI — just a daily email or Slack summary. |
-| 3 | Onboard first beta customer. Route their real traffic, show them savings in a spreadsheet. |
-| 4 | Collect feedback, tune classifier thresholds. Charge first invoice. |
+| 1 | Deploy RouteLLM server on a VPS (Hetzner/Fly.io). Verify it proxies correctly with default router. |
+| 1 | Auth shim: FastAPI layer that validates customer API keys and forwards their OpenAI key to RouteLLM. |
+| 2 | Per-customer usage logging: tokens in/out, model routed to, estimated cost saved. Daily Slack/email summary — no UI. |
+| 2 | Onboard first beta customer. Route real traffic, show savings in a spreadsheet. |
+| 3 | Tune RouteLLM cost threshold per customer based on their quality tolerance. Charge first invoice. |
 
 ### Out of Scope (MVP)
 
 - Dashboard / UI
 - Prompt compression or caching
 - Multi-provider support (Anthropic, Gemini) — OpenAI only
-- Our own model keys / markup model — customers bring their own keys
+- Holding customer API keys or markup model
 - SLA guarantees / uptime monitoring
 
 ### Stack
 
-- **Runtime:** Python + FastAPI (async, minimal overhead)
+- **Router:** [RouteLLM](https://github.com/lm-sys/routellm) (open-source, UC Berkeley + Anyscale)
+- **Auth shim:** Python + FastAPI
 - **Deploy:** Single VPS behind nginx, systemd
 - **Logging:** Append-only JSONL per customer, daily summary script
 - **Billing:** Manual invoice (Stripe later)
 
+### Why RouteLLM
+
+Research-validated: the [RouteLLM paper](https://arxiv.org/abs/2406.18665) shows ~50% cost reduction with <5% quality degradation on MMLU/MT-Bench using a classifier trained on LMSYS Chatbot Arena preference data. Building our own classifier would take weeks and perform worse. RouteLLM is the hard ML problem solved — Promptware is the productized, hosted, zero-setup wrapper.
+
 ### Key Risks
 
-- Open-source competition: RouteLLM, LiteLLM reduce willingness to pay
+- Open-source competition: customers can self-host RouteLLM for free — value prop is the managed service
 - Incumbents: OpenRouter, Anthropic prompt caching already exist
 - Commoditization: LLM prices falling faster than the pain grows
 
