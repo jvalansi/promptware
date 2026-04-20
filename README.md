@@ -6,24 +6,55 @@ A drop-in API gateway that reduces LLM inference costs automatically — no code
 
 **Target customer:** Engineering teams spending $10k–$100k+/month on LLM API calls who want automated cost reduction without building it in-house.
 
-## Plan
+## MVP Plan
 
-**Goal:** Find a paying customer before writing any code. Kill in 1 week if no one bites.
+**Scope:** Router only. OpenAI-compatible endpoint customers point at instead of `api.openai.com`. No dashboard, no compression, no caching — just routing. Flat monthly fee.
 
-### Phase 1 — Validate demand (current)
+**Success criterion:** First paying customer running production traffic through it.
 
-| Day | Task |
+### Architecture
+
+```
+Customer app
+    │  POST /v1/chat/completions (same OpenAI schema)
+    ▼
+Promptware Gateway  ←── classifier: simple or complex?
+    │                        │
+    ├── simple ──────────────▶  gpt-4o-mini  (cheap)
+    └── complex ─────────────▶  gpt-4o       (full)
+    │
+    ▼
+Response proxied back to customer (transparent)
+```
+
+**Classifier:** lightweight heuristic first (token count, keyword signals, presence of code/tools). Swap for a trained model later if needed.
+
+### Build Milestones
+
+| Week | Milestone |
 |---|---|
-| 1–2 | Landing page: problem, solution, "cut your LLM bill 30% — join the beta". Typeform for name/email/spend. Host on GitHub Pages. |
-| 3 | Google Ads campaign — $20–50/day. Keywords: "reduce LLM API costs", "openai cost optimization", "llm query routing". |
-| 4–5 | DM top signups: "What's your monthly LLM bill? Would you pay $X/mo?" Offer 5 live demos. Ask for $99 pre-order. |
-| 6–7 | **Kill or build decision:** 0 pre-orders → kill. 3+ pre-orders → build MVP (router only). |
+| 1 | FastAPI server with `/v1/chat/completions` proxy — passes all requests through unchanged. Customers can point at it and nothing breaks. |
+| 1 | Add API key auth: customers send their own OpenAI key, gateway forwards it. No key management on our side. |
+| 2 | Classifier v1: heuristic routing. Simple requests → gpt-4o-mini. Log every decision + cost delta. |
+| 2 | Deploy to a VPS (Hetzner/Fly.io). Latency target: <50ms added overhead. |
+| 3 | Per-customer usage logging (tokens in/out, model used, estimated cost saved). No UI — just a daily email or Slack summary. |
+| 3 | Onboard first beta customer. Route their real traffic, show them savings in a spreadsheet. |
+| 4 | Collect feedback, tune classifier thresholds. Charge first invoice. |
 
-**Kill signals:** <5 signups in 7 days · cost per signup >$50 · nobody answers the spend question.
+### Out of Scope (MVP)
 
-### Phase 2 — MVP (if validated)
+- Dashboard / UI
+- Prompt compression or caching
+- Multi-provider support (Anthropic, Gemini) — OpenAI only
+- Our own model keys / markup model — customers bring their own keys
+- SLA guarantees / uptime monitoring
 
-Build the router only — no dashboard. Route simple requests to a cheaper model, charge a flat monthly fee. Prompt compression and caching added later based on customer feedback.
+### Stack
+
+- **Runtime:** Python + FastAPI (async, minimal overhead)
+- **Deploy:** Single VPS behind nginx, systemd
+- **Logging:** Append-only JSONL per customer, daily summary script
+- **Billing:** Manual invoice (Stripe later)
 
 ### Key Risks
 
@@ -54,10 +85,6 @@ Representative results across published benchmarks (numbers vary by task — see
 - Extreme compression (10–20x) is viable mainly on reasoning tasks
 
 **References:** [LLMLingua](https://arxiv.org/abs/2310.05736) · [LLMLingua-2](https://arxiv.org/html/2403.12968v2) · [LongLLMLingua](https://arxiv.org/abs/2310.06839) · [SCOPE](https://arxiv.org/abs/2508.15813) · [Prompt Compression Survey NAACL 2025](https://aclanthology.org/2025.naacl-long.368/) · [Empirical Study 2025](https://arxiv.org/abs/2505.00019)
-
-## Validation
-
-See [docs/validation-plan.md](docs/validation-plan.md) for the full validation approach and current status.
 
 ## Slack
 
