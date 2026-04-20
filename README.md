@@ -6,6 +6,33 @@ A drop-in API gateway that reduces LLM inference costs automatically — no code
 
 **Target customer:** Engineering teams spending $10k–$100k+/month on LLM API calls who want automated cost reduction without building it in-house.
 
+## Plan
+
+**Goal:** Find a paying customer before writing any code. Kill in 1 week if no one bites.
+
+### Phase 1 — Validate demand (current)
+
+| Day | Task |
+|---|---|
+| 1–2 | Landing page: problem, solution, "cut your LLM bill 30% — join the beta". Typeform for name/email/spend. Host on GitHub Pages. |
+| 3 | Google Ads campaign — $20–50/day. Keywords: "reduce LLM API costs", "openai cost optimization", "llm query routing". |
+| 4–5 | DM top signups: "What's your monthly LLM bill? Would you pay $X/mo?" Offer 5 live demos. Ask for $99 pre-order. |
+| 6–7 | **Kill or build decision:** 0 pre-orders → kill. 3+ pre-orders → build MVP (router only). |
+
+**Kill signals:** <5 signups in 7 days · cost per signup >$50 · nobody answers the spend question.
+
+### Phase 2 — MVP (if validated)
+
+Build the router only — no dashboard. Route simple requests to a cheaper model, charge a flat monthly fee. Prompt compression and caching added later based on customer feedback.
+
+### Key Risks
+
+- Open-source competition: RouteLLM, LiteLLM reduce willingness to pay
+- Incumbents: OpenRouter, Anthropic prompt caching already exist
+- Commoditization: LLM prices falling faster than the pain grows
+
+---
+
 ## Prompt Compression: Cost vs. Accuracy
 
 Representative results across published benchmarks (numbers vary by task — see [empirical study](https://arxiv.org/abs/2505.00019) for apples-to-apples comparison across 6 methods × 13 datasets):
