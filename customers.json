@@ -1,0 +1,7 @@
+{
+  "pm_REPLACE_WITH_REAL_KEY": {
+    "id": "acme-corp",
+    "openai_key": "sk-REPLACE_WITH_CUSTOMER_OPENAI_KEY",
+    "threshold": 0.11593
+  }
+}
