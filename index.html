@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Promptware — Cut Your OpenAI Bill 30%</title>
+  <meta name="description" content="Drop-in API proxy that automatically routes LLM requests to the cheapest model that can handle them. No code changes beyond swapping the endpoint.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #1e1e2e;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --green: #10b981;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* Nav */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(10,10,15,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--accent); }
+
+    nav a.cta-nav {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    nav a.cta-nav:hover { background: var(--accent-hover); }
+
+    /* Hero */
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 6rem 2rem 4rem;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(99,102,241,0.15);
+      color: var(--accent-hover);
+      border: 1px solid rgba(99,102,241,0.3);
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+    h1 em {
+      font-style: normal;
+      color: var(--accent-hover);
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.85rem 2rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1rem;
+      transition: background 0.15s, transform 0.1s;
+      display: inline-block;
+    }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+    .btn-ghost {
+      color: var(--muted);
+      padding: 0.85rem 2rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+    /* Code snippet */
+    .code-demo {
+      max-width: 640px;
+      margin: 4rem auto 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .code-demo-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green { background: #28c840; }
+    .code-demo-title { color: var(--muted); font-size: 0.8rem; margin-left: 0.5rem; }
+
+    .code-pane { display: flex; }
+
+    .code-col {
+      flex: 1;
+      padding: 1.5rem 1.25rem;
+    }
+    .code-col + .code-col {
+      border-left: 1px solid var(--border);
+    }
+
+    .code-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+    .label-before { color: #f87171; }
+    .label-after { color: var(--green); }
+
+    pre {
+      font-family: "SF Mono", "Fira Code", Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .strike { color: #f87171; text-decoration: line-through; opacity: 0.6; }
+    .highlight { color: var(--green); }
+
+    /* Stats bar */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      flex-wrap: wrap;
+      padding: 3rem 2rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin: 4rem 0 0;
+    }
+
+    .stat { text-align: center; }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--accent-hover);
+    }
+    .stat-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* How it works */
+    section { max-width: 900px; margin: 0 auto; padding: 5rem 2rem; }
+
+    h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+    }
+    .section-sub { color: var(--muted); margin-bottom: 3rem; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(99,102,241,0.15);
+      color: var(--accent-hover);
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .step p { font-size: 0.9rem; color: var(--muted); }
+
+    /* Pricing */
+    .pricing-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 2rem;
+    }
+    .pricing-table th, .pricing-table td {
+      padding: 0.9rem 1.25rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .pricing-table th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .pricing-table td:last-child { color: var(--green); font-weight: 600; }
+    .pricing-table tr:last-child td { border-bottom: none; }
+
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 1rem; }
+
+    details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    summary {
+      font-weight: 600;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    summary::after { content: "+"; color: var(--accent-hover); font-size: 1.2rem; transition: transform 0.2s; }
+    details[open] summary::after { content: "−"; }
+    details p { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; }
+
+    /* Signup */
+    .signup-section {
+      text-align: center;
+      padding: 5rem 2rem;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    .signup-section h2 { margin-bottom: 0.75rem; }
+    .signup-section p { color: var(--muted); margin-bottom: 2rem; }
+
+    .typeform-embed {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a class="logo" href="#"><span>Prompt</span>ware</a>
+  <a class="cta-nav" href="#signup">Join the Beta</a>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="badge">Private Beta — Limited Spots</div>
+  <h1>Cut Your OpenAI Bill <em>30%</em> — Drop-In Proxy, Zero Code Changes</h1>
+  <p>Swap one API endpoint. Promptware classifies each request in real-time and routes simple queries to cheaper models automatically — you keep your OpenAI key and your existing code.</p>
+  <div class="cta-group">
+    <a class="btn-primary" href="#signup">Join the Beta →</a>
+    <a class="btn-ghost" href="#how">See How It Works</a>
+  </div>
+
+  <!-- Code demo -->
+  <div class="code-demo">
+    <div class="code-demo-header">
+      <div class="dot dot-red"></div>
+      <div class="dot dot-yellow"></div>
+      <div class="dot dot-green"></div>
+      <span class="code-demo-title">One-line change. That's it.</span>
+    </div>
+    <div class="code-pane">
+      <div class="code-col">
+        <div class="code-label label-before">Before</div>
+        <pre>client = OpenAI(
+  <span class="strike">base_url="https://api.openai.com/v1"</span>,
+  api_key=YOUR_OPENAI_KEY,
+)</pre>
+      </div>
+      <div class="code-col">
+        <div class="code-label label-after">After</div>
+        <pre>client = OpenAI(
+  <span class="highlight">base_url="https://api.promptware.io/v1"</span>,
+  api_key=YOUR_OPENAI_KEY,
+)</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-number">~30%</div>
+    <div class="stat-label">Average cost reduction</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number">&lt;5%</div>
+    <div class="stat-label">Quality degradation on benchmarks</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number">&lt;10ms</div>
+    <div class="stat-label">Routing overhead</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number">0</div>
+    <div class="stat-label">Code changes required</div>
+  </div>
+</div>
+
+<!-- How it works -->
+<section id="how">
+  <h2>How It Works</h2>
+  <p class="section-sub">A lightweight classifier sits between your app and OpenAI. Every request is scored for complexity and routed to the right model in milliseconds.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Swap the endpoint</h3>
+      <p>Change <code style="color:var(--accent-hover);font-size:0.85em">base_url</code> in your OpenAI client. Pass your own API key — we never store it.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>We classify each request</h3>
+      <p>A real-time complexity classifier (trained on LMSYS Arena data) scores every prompt. Simple = cheap model. Complex = full model.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Savings appear immediately</h3>
+      <p>You get a daily breakdown: requests routed, tokens saved, dollars saved. No dashboard needed — just a Slack or email summary.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Savings estimate -->
+<section>
+  <h2>What Could You Save?</h2>
+  <p class="section-sub">Based on RouteLLM benchmarks (UC Berkeley / Anyscale). Actual savings depend on your traffic mix.</p>
+
+  <table class="pricing-table">
+    <thead>
+      <tr>
+        <th>Monthly OpenAI spend</th>
+        <th>gpt-4o-mini routing share</th>
+        <th>Estimated monthly savings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>$5,000 / mo</td>
+        <td>~50% of requests</td>
+        <td>~$1,500 / mo</td>
+      </tr>
+      <tr>
+        <td>$20,000 / mo</td>
+        <td>~50% of requests</td>
+        <td>~$6,000 / mo</td>
+      </tr>
+      <tr>
+        <td>$100,000 / mo</td>
+        <td>~50% of requests</td>
+        <td>~$30,000 / mo</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- FAQ -->
+<section>
+  <h2>Common Questions</h2>
+  <div class="faq-list">
+    <details>
+      <summary>Do you see our prompts?</summary>
+      <p>Promptware inspects prompts only to classify complexity (a lightweight embedding score — not stored). Your data is never logged, sold, or used to train models. We see metadata (token counts, model routed) not content.</p>
+    </details>
+    <details>
+      <summary>What if a simple request gets routed to the cheap model incorrectly?</summary>
+      <p>The RouteLLM classifier is calibrated conservatively — it degrades quality by less than 5% on MMLU and MT-Bench. You can also set a quality threshold per customer to tune the cutoff toward cost or quality.</p>
+    </details>
+    <details>
+      <summary>Do you hold our OpenAI API key?</summary>
+      <p>No. You pass your own key in the Authorization header on every request, exactly like you do with OpenAI directly. We proxy it but never store it.</p>
+    </details>
+    <details>
+      <summary>What models are supported?</summary>
+      <p>Beta: gpt-4o and gpt-4o-mini routing (OpenAI only). Anthropic Claude and Google Gemini routing are on the roadmap.</p>
+    </details>
+    <details>
+      <summary>Can I self-host RouteLLM instead?</summary>
+      <p>Absolutely — RouteLLM is open-source. Promptware is for teams that don't want to operate the infrastructure, tune thresholds, maintain uptime, and build the logging layer themselves.</p>
+    </details>
+  </div>
+</section>
+
+<!-- Signup -->
+<div class="signup-section" id="signup">
+  <h2>Join the Beta</h2>
+  <p>We're onboarding a small cohort of teams spending $5k+/mo on LLM APIs.<br>Tell us about your setup — we'll reach out within 24 hours.</p>
+
+  <div class="typeform-embed">
+    <!-- Typeform embed — replace YOUR_FORM_ID with your actual Typeform form ID -->
+    <div data-tf-live="YOUR_FORM_ID"></div>
+    <script src="//embed.typeform.com/next/embed.js"></script>
+
+    <!-- Fallback if Typeform not yet configured -->
+    <noscript>
+      <a class="btn-primary" href="mailto:hello@promptware.io?subject=Beta signup" style="display:inline-block;margin-top:1rem">
+        Email us to join the beta →
+      </a>
+    </noscript>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>© 2026 Promptware · Built on <a href="https://github.com/lm-sys/routellm" style="color:var(--accent-hover);text-decoration:none">RouteLLM</a> (UC Berkeley + Anyscale research)</p>
+</footer>
+
+</body>
+</html>
