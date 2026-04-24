@@ -31,6 +31,11 @@ async def chat_completions(request: Request):
     body_bytes = await request.body()
     body = json.loads(body_bytes)
 
+    # RouteLLM requires model in "router-mf-{threshold}" format
+    threshold = customer.get("threshold", 0.11593)
+    body["model"] = f"router-mf-{threshold}"
+    body_bytes = json.dumps(body).encode()
+
     forward_headers = {
         "Authorization": f"Bearer {customer['openai_key']}",
         "Content-Type": "application/json",
@@ -51,10 +56,14 @@ async def chat_completions(request: Request):
             headers=forward_headers,
         )
 
-    if resp.status_code != 200:
-        return JSONResponse(status_code=resp.status_code, content=resp.json())
+    try:
+        resp_data = resp.json()
+    except Exception:
+        return JSONResponse(status_code=502, content={"error": resp.text})
 
-    resp_data = resp.json()
+    if resp.status_code != 200:
+        return JSONResponse(status_code=resp.status_code, content=resp_data)
+
     latency_ms = int((time.time() - t0) * 1000)
     log_request(customer["id"], body, resp_data, latency_ms)
 
