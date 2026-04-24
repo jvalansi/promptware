@@ -34,13 +34,13 @@ Customers bring their own OpenAI key — no key management or markup on our side
 
 ### Build Milestones
 
-| Week | Milestone |
-|---|---|
-| 1 | Deploy RouteLLM server on a VPS (Hetzner/Fly.io). Verify it proxies correctly with default router. |
-| 1 | Auth shim: FastAPI layer that validates customer API keys and forwards their OpenAI key to RouteLLM. |
-| 2 | Per-customer usage logging: tokens in/out, model routed to, estimated cost saved. Daily Slack/email summary — no UI. |
-| 2 | Onboard first beta customer. Route real traffic, show savings in a spreadsheet. |
-| 3 | Tune RouteLLM cost threshold per customer based on their quality tolerance. Charge first invoice. |
+| Week | Milestone | Status |
+|---|---|---|
+| 1 | Deploy RouteLLM server on a VPS. Verify it proxies correctly with default router. | ✅ Done |
+| 1 | Auth shim: FastAPI layer that validates customer API keys and forwards their OpenAI key to RouteLLM. | ✅ Done |
+| 2 | Per-customer usage logging: tokens in/out, model routed to, estimated cost saved. Daily Slack/email summary — no UI. | ✅ Done |
+| 2 | Onboard first beta customer. Route real traffic, show savings in a spreadsheet. | ⏳ Next |
+| 3 | Tune RouteLLM cost threshold per customer based on their quality tolerance. Charge first invoice. | — |
 
 ### Out of Scope (MVP)
 
@@ -54,9 +54,63 @@ Customers bring their own OpenAI key — no key management or markup on our side
 
 - **Router:** [RouteLLM](https://github.com/lm-sys/routellm) (open-source, UC Berkeley + Anyscale)
 - **Auth shim:** Python + FastAPI
-- **Deploy:** Single VPS behind nginx, systemd
-- **Logging:** Append-only JSONL per customer, daily summary script
+- **Deploy:** DigitalOcean Droplet (NYC3, 4GB RAM) — `167.71.102.223` — behind nginx, systemd
+- **Logging:** Append-only JSONL per customer (`logs/<customer_id>.jsonl`), daily summary script
 - **Billing:** Manual invoice (Stripe later)
+
+### Running the Server
+
+**SSH access:**
+```bash
+ssh -i ~/.ssh/promptware_do root@167.71.102.223
+```
+
+**Services:**
+```bash
+systemctl status routellm          # RouteLLM classifier + proxy (port 18080)
+systemctl status promptware-gateway  # FastAPI auth shim (port 8000)
+systemctl status nginx             # Public HTTP (port 80)
+```
+
+**Add a customer:**
+
+Edit `/opt/promptware/customers.json` on the server:
+```json
+{
+  "pm_<random_key>": {
+    "id": "customer-slug",
+    "openai_key": "sk-...",
+    "threshold": 0.11593
+  }
+}
+```
+No restart needed — config is read on each request.
+
+**View logs:**
+```bash
+tail -f /opt/promptware/logs/<customer_id>.jsonl
+```
+
+**Run daily summary manually:**
+```bash
+SLACK_WEBHOOK_URL=https://... /opt/promptware/venv/bin/python /opt/promptware/scripts/daily_summary.py
+```
+
+**Test the endpoint:**
+```bash
+curl http://167.71.102.223/v1/chat/completions \
+  -H "Authorization: Bearer pm_<key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**Customer integration (one-line change):**
+```python
+client = OpenAI(
+    base_url="http://167.71.102.223/v1",
+    api_key="pm_<their_promptware_key>",
+)
+```
 
 ### Why RouteLLM
 
