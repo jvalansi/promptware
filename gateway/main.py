@@ -94,7 +94,10 @@ async def _handle_openai(body, body_bytes, api_key, threshold, customer):
 async def _handle_litellm(body, api_key, threshold, provider, customer):
     messages = body.get("messages", [])
 
-    routed = get_controller().route(prompt=messages, router="mf", threshold=threshold)
+    prompt_text = "\n".join(
+        m["content"] for m in messages if isinstance(m.get("content"), str)
+    )
+    routed = get_controller().route(prompt=prompt_text, router="mf", threshold=threshold)
     if routed == "strong":
         model = customer.get("strong_model", DEFAULT_STRONG.get(provider, DEFAULT_STRONG["openai"]))
     else:
