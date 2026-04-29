@@ -18,19 +18,22 @@ A drop-in API gateway that reduces LLM inference costs automatically — no code
 Customer app
     │  POST /v1/chat/completions (OpenAI schema, customer's own API key)
     ▼
-Auth shim (FastAPI)  ──── validates customer key, injects OpenAI key
+Auth shim (FastAPI)  ──── validates customer key, resolves provider
     │
     ▼
-RouteLLM server  ──── classifies request complexity
+RouteLLM classifier  ──── classifies request complexity (weak / strong)
     │                        │
-    ├── simple ──────────────▶  gpt-4o-mini  (cheap)
-    └── complex ─────────────▶  gpt-4o       (full)
+    ├── simple ──────────────▶  cheap model   (gpt-4o-mini / claude-haiku)
+    └── complex ─────────────▶  full model    (gpt-4o / claude-sonnet)
+    │
+    ▼
+LiteLLM  ──── dispatches to the right provider API
     │
     ▼
 Response proxied back to customer (transparent)
 ```
 
-Customers bring their own OpenAI key — no key management or markup on our side.
+Customers bring their own API key (OpenAI or Anthropic) — no key management or markup on our side.
 
 ### Build Milestones
 
@@ -46,13 +49,13 @@ Customers bring their own OpenAI key — no key management or markup on our side
 
 - Dashboard / UI
 - Prompt compression or caching
-- Multi-provider support (Anthropic, Gemini) — OpenAI only
 - Holding customer API keys or markup model
 - SLA guarantees / uptime monitoring
 
 ### Stack
 
-- **Router:** [RouteLLM](https://github.com/lm-sys/routellm) (open-source, UC Berkeley + Anyscale)
+- **Router:** [RouteLLM](https://github.com/lm-sys/routellm) (open-source, UC Berkeley + Anyscale) — complexity classifier
+- **Provider dispatch:** [LiteLLM](https://github.com/BerriAI/litellm) — translates to OpenAI, Anthropic, and other provider APIs
 - **Auth shim:** Python + FastAPI
 - **Deploy:** DigitalOcean Droplet (NYC3, 4GB RAM) — `167.71.102.223` — behind nginx, systemd
 - **Logging:** Append-only JSONL per customer (`logs/<customer_id>.jsonl`), daily summary script
@@ -79,11 +82,17 @@ Edit `/opt/promptware/customers.json` on the server:
 {
   "pm_<random_key>": {
     "id": "customer-slug",
-    "openai_key": "sk-...",
-    "threshold": 0.11593
+    "provider": "openai",
+    "api_key": "sk-...",
+    "threshold": 0.11593,
+    "weak_model": "gpt-4o-mini",
+    "strong_model": "gpt-4o"
   }
 }
 ```
+
+For Anthropic customers, set `"provider": "anthropic"` and an `"api_key": "sk-ant-..."`. Default models are `claude-haiku-4-5-20251001` (weak) and `claude-sonnet-4-5` (strong). `weak_model` and `strong_model` can be omitted to use the defaults.
+
 No restart needed — config is read on each request.
 
 **View logs:**
